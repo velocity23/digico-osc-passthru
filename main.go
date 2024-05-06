@@ -6,44 +6,74 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func main() {
 	fmt.Println("Starting DiGiCo OSC Passthru...")
 
+	consoleIp, consoleRx, consoleTx := os.Args[1], os.Args[2], os.Args[3]
 	clients := []osc.Client{}
 
-	consoleIp, consoleRx, consoleTx := os.Args[1], os.Args[2], os.Args[3]
+	fmt.Println("RX", consoleRx)
+	fmt.Println("TX", consoleTx)
 
 	txInt, err := strconv.Atoi(consoleTx)
 	if err != nil {
 		fmt.Println("Error converting tx port to int")
 		return
 	}
-	consoleClient := osc.NewClient(consoleIp, txInt)
 
-	d1 := osc.NewStandardDispatcher()
-	d1.AddMsgHandler("*", func(msg *osc.Message, addr *net.Addr) {
-		consoleClient.Send(msg)
-		clients = append(clients, *osc.NewClient((*addr).String(), txInt))
-	})
-	distroServer := &osc.Server{
-		Addr:       ":" + consoleRx,
-		Dispatcher: d1,
+	rxInt, err := strconv.Atoi(consoleRx)
+	if err != nil {
+		fmt.Println("Error converting rx port to int")
+		return
 	}
-	distroServer.ListenAndServe()
-	defer distroServer.CloseConnection()
 
-	d2 := osc.NewStandardDispatcher()
-	d2.AddMsgHandler("*", func(msg *osc.Message, _ *net.Addr) {
-		for _, client := range clients {
+	go initTx(txInt, &clients)
+	initRx(consoleIp, rxInt, txInt, &clients)
+}
+
+func initTx(txInt int, clients *[]osc.Client) {
+	d := osc.NewStandardDispatcher()
+	// From Console
+	d.AddMsgHandler("*", func(msg *osc.Message, _ *net.Addr) {
+		fmt.Println("From Console", msg.Address)
+		if len(*clients) == 0 {
+			fmt.Println("No Clients")
+		}
+		for _, client := range *clients {
+			fmt.Println("Sending to", client.IP())
 			client.Send(msg)
 		}
+		fmt.Println("")
 	})
-	consoleServer := &osc.Server{
-		Addr:       ":" + consoleTx,
-		Dispatcher: d2,
+	fromConsole := &osc.Server{
+		Addr:       "0.0.0.0:" + fmt.Sprint(txInt),
+		Dispatcher: d,
 	}
-	consoleServer.ListenAndServe()
-	defer consoleServer.CloseConnection()
+	fromConsole.ListenAndServe()
+	defer fromConsole.CloseConnection()
+}
+
+func initRx(consoleIp string, rxInt int, txInt int, clients *[]osc.Client) {
+	toConsole := osc.NewClient(consoleIp, rxInt)
+	d := osc.NewStandardDispatcher()
+	// From Clients
+	d.AddMsgHandler("*", func(msg *osc.Message, addr *net.Addr) {
+		toConsole.Send(msg)
+		
+		for _, client := range *clients {
+			if (strings.Split(client.IP(), ":")[0] == strings.Split((*addr).String(), ":")[0]) {
+				return
+			}
+		}
+		*clients = append(*clients, *osc.NewClient(strings.Split((*addr).String(), ":")[0], txInt))
+	})
+	fromClients := &osc.Server{
+		Addr:       ":" + fmt.Sprint(rxInt),
+		Dispatcher: d,
+	}
+	fromClients.ListenAndServe()
+	defer fromClients.CloseConnection()
 }
