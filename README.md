@@ -21,3 +21,5 @@ Then add the following line, changing the binary path as required:
 ```
 @reboot /path/to/digico-osc-passthru "Console IP" "Console RX Port" "Console TX Port"
 ```
+
+To exit the `nano` editor, use the following keyboard commands: <kbd>Ctrl</kbd> + <kbd>X</kbd>, <kbd>Y</kbd>, <kbd>Enter</kbd>
