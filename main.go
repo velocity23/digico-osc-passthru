@@ -30,11 +30,11 @@ func main() {
 		return
 	}
 
-	go initTx(txInt, &clients)
-	initRx(consoleIp, rxInt, txInt, &clients)
+	go initConsole(txInt, &clients)
+	initClients(consoleIp, rxInt, txInt, &clients)
 }
 
-func initTx(txInt int, clients *[]osc.Client) {
+func initConsole(txInt int, clients *[]osc.Client) {
 	d := osc.NewStandardDispatcher()
 	// From Console
 	d.AddMsgHandler("*", func(msg *osc.Message, _ *net.Addr) {
@@ -56,7 +56,7 @@ func initTx(txInt int, clients *[]osc.Client) {
 	defer fromConsole.CloseConnection()
 }
 
-func initRx(consoleIp string, rxInt int, txInt int, clients *[]osc.Client) {
+func initClients(consoleIp string, rxInt int, txInt int, clients *[]osc.Client) {
 	toConsole := osc.NewClient(consoleIp, rxInt)
 	d := osc.NewStandardDispatcher()
 	// From Clients
